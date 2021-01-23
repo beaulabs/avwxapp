@@ -1,0 +1,9 @@
+# Elements to not version control
+
+# Scratchpad
+scratchpad/
+
+# SSH Keys
+*.pem
+
+.vscode/
