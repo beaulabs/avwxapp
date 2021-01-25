@@ -26,6 +26,8 @@ dbav = client.avweather
 metarcol = dbav.metar
 tafcol = dbav.taf
 stncol = dbav.airports
+
+
 #stncol = dbav.station
 
 # FUNCTIONS
