@@ -1,6 +1,6 @@
 import os
 import requests
-import datetime
+from datetime import datetime
 import time
 import json
 import pymongo
@@ -65,7 +65,7 @@ def metar_worker(stn):
     metar_rec_insert = metarcol.insert_one(dict_metar)
 
 
-def wx_worker(stn_to_process, stn_completed):
+def wx_worker(stn_to_process, stn_completed, skip_stnworker):
     while True:
         try:
             '''
@@ -73,11 +73,15 @@ def wx_worker(stn_to_process, stn_completed):
                 raise queue. Empty exception if the queue is empty.
                 queue(False) function would do the same task also.
             '''
+            skip_stnworker = skip_stnworker
             stn = stn_to_process.get_nowait()
             print("Processing Station: " + stn)
             metar_worker(stn)
             taf_worker(stn)
-            stn_worker(stn)
+            if skip_stnworker == True:
+                continue
+            else:
+                stn_worker(stn)
 
         except queue.Empty:
             break
@@ -98,6 +102,19 @@ def wx_process():
     stn_to_process = Queue()
     stn_completed = Queue()
     processes = []
+    skip_stnworker = False
+
+    # Check and ensure station collection hasn't already been populated. Airport information doesn't change very often (except operational flag)
+    # which I'll build more logic in as I have time.
+    stn_exist = stncol.count_documents({})
+    if stn_exist == 50:
+        skip_stnworker = True
+    else:
+        stncol.drop()
+
+    # Tafs are only issued at 0000 / 0600 / 1200 / 1800 UTC. There is no need to poll the tafs with each run. This checks current UTC time
+    # and if within range will trigger to run the taf_worker
+    datetime_utcobj = datetime.utcnow()
 
     stn_list = ["katl", "zbaa", "klax", "omdb", "rjtt", "kord", "egll", "zspd", "lfpg", "kdfw", "zggg", "eham", "vhhh", "rksi", "eddf", "kden", "vidp", "wsss", "vtbs", "kjfk",
                 "wmkk", "lemd", "ksfo", "zuuu", "wiii", "zgsz", "lebl", "ltfm", "ksea", "klas", "kmco", "cyyz", "mmmx", "kclt", "uuee", "rctp", "zppp", "eddm", "rpll", "zlxy", "vabb",
@@ -108,7 +125,8 @@ def wx_process():
 
     # Create the processes
     for w in range(number_of_processes):
-        p = Process(target=wx_worker, args=(stn_to_process, stn_completed))
+        p = Process(target=wx_worker, args=(
+            stn_to_process, stn_completed, skip_stnworker))
         processes.append(p)
         p.start()
 
